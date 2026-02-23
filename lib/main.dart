@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 
@@ -12,94 +10,107 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+    return const MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: MyHomePage(),
     );
   }
 }
 
 class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-  final String title;
+  const MyHomePage({super.key});
 
   @override
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage>  with SingleTickerProviderStateMixin {
-  double top = 1;
-  double left = 1;
-  final double boxSize = 50.0;
-  bool isPlay = false;
+class _MyHomePageState extends State<MyHomePage>
+    with SingleTickerProviderStateMixin {
+  Offset position = const Offset(100, 200);
+  final double boxSize = 100;
 
-  void _moveBox() {
-    // Get screen dimensions
-    final screenSize = MediaQuery.of(context).size;
-    setState(() {
-      // Calculate random position within screen bounds
-      top = Random().nextDouble() * (screenSize.height - boxSize - 50);
-      left = Random().nextDouble() * (screenSize.width - boxSize);
-    });
+  late AnimationController controller;
+  late Animation<Offset> animation;
+
+  @override
+  void initState() {
+    super.initState();
+    controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+  }
+
+  void moveToBottom() {
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    animation = Tween<Offset>(
+      begin: position,
+      end: Offset(position.dx, screenHeight - boxSize - 40),
+    ).animate(CurvedAnimation(
+      parent: controller,
+      curve: Curves.easeOut,
+    ))
+      ..addListener(() {
+        setState(() {
+          position = animation.value;
+        });
+      });
+
+    controller.forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+
     return Scaffold(
-      body: Center(
-        child: Stack(
-          children: [
-            // 1. Your background content goes here
-            Image.asset(
-              'assets/images/bg1.jpg',
-              fit: BoxFit.fill,
-              width: double.infinity,
-              height: double.infinity,
-            ), // Background
-            // 2. Create a layer for liquid glass effects
-            AnimatedPositioned(
-              duration: Duration(seconds: 2),
-              curve: Curves.easeInOut,
-              top: top,
-              left: left,
-              onEnd: () {
-                if (isPlay) {
-                  _moveBox();
-                }
+      body: Stack(
+        children: [
+          Image.asset(
+            'assets/images/bg1.jpg',
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
+          ),
+
+          Positioned(
+            left: position.dx,
+            top: position.dy,
+            child: GestureDetector(
+              onPanUpdate: (details) {
+                setState(() {
+                  final newX = position.dx + details.delta.dx;
+                  final newY = position.dy + details.delta.dy;
+
+                  position = Offset(
+                    newX.clamp(0, screenSize.width - boxSize),
+                    newY.clamp(0, screenSize.height - boxSize),
+                  );
+                });
               },
               child: LiquidGlassLayer(
-                settings: LiquidGlassSettings(
-                  blur: 3.5
-                ),
+                settings: const LiquidGlassSettings(blur: 6),
                 child: LiquidGlass(
                   shape: LiquidRoundedSuperellipse(borderRadius: 30),
-                  child: const SizedBox.square(dimension: 100),
+                  child: SizedBox.square(
+                    dimension: boxSize,
+                  ),
                 ),
-              ),
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: LiquidGlassLayer(
-        child: GestureDetector(
-          onTap: () {
-            isPlay = !isPlay;
-            _moveBox();
-          },
-          child: LiquidGlass(
-            shape: LiquidRoundedSuperellipse(borderRadius: 30),
-            child: SizedBox(
-              width: 56,
-              height: 56,
-              child: Icon(
-                !isPlay ? Icons.play_arrow : Icons.pause
               ),
             ),
           ),
-        ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: moveToBottom,
+        child: const Icon(Icons.arrow_downward),
       ),
     );
   }
